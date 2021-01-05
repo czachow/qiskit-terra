@@ -1,0 +1,114 @@
+# This code is part of Qiskit.
+#
+# (C) Copyright IBM 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+"""Evaluate a score for the layout.
+
+Saves in `property_set['layout_score']` a measure for the score, i.e. fidelity of the layout.
+The closer the number to one, the better the selection. Therefore, 1 is a perfect error-free layout.
+No CX direction is considered.
+"""
+import numpy as np
+from itertools import combinations
+
+from qiskit.circuit import Gate, Measure
+from qiskit.transpiler.basepasses import AnalysisPass
+
+
+DEFAULT_1Q_ERROR = 5 * 10**(-3)
+DEFAULT_2Q_ERROR = 5 * 10**(-2)
+DEFAULT_MS_ERROR = 5 * 10**(-2)
+
+
+class LayoutScorer(AnalysisPass):
+    """Evaluate a score for the layout.
+
+    Saves in `property_set['layout_score']` (or the property name in property_name) a measure for the score,
+    i.e. fidelity of the layout. Alternatively, it returns the score. The closer the number to one, the better
+    the selection. Therefore, 1 is a perfect error-free layout. No CX direction is considered.
+    """
+    def __init__(self, coupling_map, backend_prop=None, property_name='layout_score'):
+        """LayoutScorer initializer.
+
+        Args:
+            coupling_map (CouplingMap): Directed graph represented a coupling map.
+            backend_prop (BackendProperties): Properties of the used backend.
+            property_name (str): The property name to save the score. Default: layout_score
+        """
+        super().__init__()
+        self.coupling_map = coupling_map
+        self.backend_prop = backend_prop
+        self.property_name = property_name
+
+    def run(self, dag):
+        """
+        Run the LayoutScorer pass on `dag`.
+        Args:
+            dag (DAGCircuit): DAG to evaluate.
+        """
+        layout = self.property_set["layout"]
+        if layout is None:
+            return
+        layout_score = self.evaluate(dag, layout)
+        self.property_set[self.property_name] = layout_score
+
+    def evaluate(self, dag, layout):
+        """
+        Evaluate the LayoutScorer on a layout and dag.
+        Calculate the score as the product of all fidelities
+        Args:
+            dag (DAGCircuit): DAG to evaluate
+            layout (Layout): Layout to evaluate
+        """
+        layout_fidelity = 1.0
+        for node in dag.op_nodes(include_directives=False):
+            physical_qubits = [layout[qubit] for qubit in node.qargs]
+            if isinstance(node.op, Gate):
+                if len(node.qargs) == 1:
+                    layout_fidelity *= self._calculate_1q_fidelity(physical_qubits)
+                elif len(node.qargs) == 2:
+                    layout_fidelity *= self._calculate_2q_fidelity(physical_qubits)
+            elif isinstance(node.op, Measure):
+                layout_fidelity *= self._calculate_ms_fidelity(physical_qubits)
+        return layout_fidelity
+
+    def _calculate_1q_fidelity(self, qubits):
+        """Calculate the 1q fidelity"""
+        if self.backend_prop:
+            return 1 - 1/2 * (self.backend_prop.gate_error("u2", qubits) +
+                              self.backend_prop.gate_error("u3", qubits))
+        else:
+            return 1 - DEFAULT_1Q_ERROR
+
+    def _calculate_2q_fidelity(self, qubits):
+        """Calculate the 2q fidelity"""
+        def tq_fidelity(qubits):
+            if self.backend_prop:
+                return 1 - self.backend_prop.gate_error("cx", qubits)
+            else:
+                return 1 - DEFAULT__ERROR
+
+        cplpath = self.coupling_map.shortest_undirected_path(*qubits)
+        cplpath_length = len(cplpath) - 1
+        cplpath_edges = [[cplpath[k], cplpath[k+1]] for k in range(cplpath_length)]
+
+        path_score = 1.0
+        for qubit_subset in combinations(cplpath_edges, cplpath_length - 1):
+            path_score *= np.prod([tq_fidelity(qubits)**5 for qubits in qubit_subset])
+
+        return np.prod([tq_fidelity(qubits) for qubits in cplpath_edges]) / cplpath_length * path_score
+
+    def _calculate_ms_fidelity(self, qubits):
+        """Calculate mesure fidelity"""
+        if self.backend_prop:
+            return 1 - self.backend_prop.readout_error(*qubits)
+        else:
+            return 1 - DEFAULT_MS_ERROR
