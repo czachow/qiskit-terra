@@ -94,7 +94,7 @@ class LayoutScorer(AnalysisPass):
             if self.backend_prop:
                 return 1 - self.backend_prop.gate_error("cx", qubits)
             else:
-                return 1 - DEFAULT__ERROR
+                return 1 - DEFAULT_2Q_ERROR
 
         cplpath = self.coupling_map.shortest_undirected_path(*qubits)
         cplpath_length = len(cplpath) - 1
@@ -107,7 +107,7 @@ class LayoutScorer(AnalysisPass):
         return np.prod([tq_fidelity(qubits) for qubits in cplpath_edges]) / cplpath_length * path_score
 
     def _calculate_ms_fidelity(self, qubits):
-        """Calculate mesure fidelity"""
+        """Calculate measure fidelity"""
         if self.backend_prop:
             return 1 - self.backend_prop.readout_error(*qubits)
         else:
