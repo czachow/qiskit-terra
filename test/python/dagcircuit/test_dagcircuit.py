@@ -21,9 +21,10 @@ import retworkx as rx
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.circuit import QuantumRegister
 from qiskit.circuit import ClassicalRegister, Clbit
-from qiskit.circuit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit, Qubit
 from qiskit.circuit import Measure
 from qiskit.circuit import Reset
+from qiskit.circuit import Delay
 from qiskit.circuit import Gate, Instruction
 from qiskit.circuit import Parameter
 from qiskit.circuit.library.standard_gates.i import IGate
@@ -174,6 +175,68 @@ class TestDagRegisters(QiskitTestCase):
         dag = DAGCircuit()
         cr = ClassicalRegister(2)
         self.assertRaises(DAGCircuitError, dag.add_qreg, cr)
+
+    def test_add_qubits_invalid_qubits(self):
+        """Verify we raise if pass not a Qubit."""
+        dag = DAGCircuit()
+
+        with self.assertRaisesRegex(DAGCircuitError, "not a Qubit instance"):
+            dag.add_qubits([Clbit()])
+
+        with self.assertRaisesRegex(DAGCircuitError, "not a Qubit instance"):
+            dag.add_qubits([Qubit(), Clbit(), Qubit()])
+
+    def test_add_qubits_invalid_clbits(self):
+        """Verify we raise if pass not a Clbit."""
+        dag = DAGCircuit()
+
+        with self.assertRaisesRegex(DAGCircuitError, "not a Clbit instance"):
+            dag.add_clbits([Qubit()])
+
+        with self.assertRaisesRegex(DAGCircuitError, "not a Clbit instance"):
+            dag.add_clbits([Clbit(), Qubit(), Clbit()])
+
+    def test_raise_if_bits_already_present(self):
+        """Verify we raise when attempting to add a Bit already in the DAG."""
+        dag = DAGCircuit()
+        qubits = [Qubit(), Qubit()]
+        clbits = [Clbit(), Clbit()]
+
+        dag.add_qubits(qubits)
+        dag.add_clbits(clbits)
+
+        with self.assertRaisesRegex(DAGCircuitError, "duplicate qubits"):
+            dag.add_qubits(qubits)
+
+        with self.assertRaisesRegex(DAGCircuitError, "duplicate clbits "):
+            dag.add_clbits(clbits)
+
+    def test_raise_if_bits_already_present_from_register(self):
+        """Verify we raise when attempting to add a Bit already in the DAG."""
+        dag = DAGCircuit()
+        qr = QuantumRegister(2, 'q')
+        cr = ClassicalRegister(2, 'c')
+        dag.add_creg(cr)
+        dag.add_qreg(qr)
+
+        with self.assertRaisesRegex(DAGCircuitError, "duplicate qubits"):
+            dag.add_qubits(qr[:])
+
+        with self.assertRaisesRegex(DAGCircuitError, "duplicate clbits "):
+            dag.add_clbits(cr[:])
+
+    def test_addding_individual_bit(self):
+        """Verify we can add a individual bits to a DAG."""
+        qr = QuantumRegister(3, 'qr')
+        dag = DAGCircuit()
+        dag.add_qreg(qr)
+
+        new_bit = Qubit()
+
+        dag.add_qubits([new_bit])
+
+        self.assertEqual(dag.qubits, list(qr) + [new_bit])
+        self.assertEqual(list(dag.qregs.values()), [qr])
 
 
 class TestDagApplyOperation(QiskitTestCase):
@@ -712,6 +775,8 @@ class TestDagNodeSelection(QiskitTestCase):
 
     def test_dag_collect_1q_runs(self):
         """Test the collect_1q_runs method with 3 different gates."""
+        self.dag.apply_operation_back(Reset(), [self.qubit0])
+        self.dag.apply_operation_back(Delay(100), [self.qubit0])
         self.dag.apply_operation_back(U1Gate(3.14), [self.qubit0])
         self.dag.apply_operation_back(U1Gate(3.14), [self.qubit0])
         self.dag.apply_operation_back(U1Gate(3.14), [self.qubit0])
@@ -736,6 +801,8 @@ class TestDagNodeSelection(QiskitTestCase):
 
     def test_dag_collect_1q_runs_start_with_conditional(self):
         """Test collect 1q runs with a conditional at the start of the run."""
+        self.dag.apply_operation_back(Reset(), [self.qubit0])
+        self.dag.apply_operation_back(Delay(100), [self.qubit0])
         h_gate = HGate()
         h_gate.condition = self.condition
         self.dag.apply_operation_back(
@@ -752,6 +819,8 @@ class TestDagNodeSelection(QiskitTestCase):
 
     def test_dag_collect_1q_runs_conditional_in_middle(self):
         """Test collect_1q_runs with a conditional in the middle of a run."""
+        self.dag.apply_operation_back(Reset(), [self.qubit0])
+        self.dag.apply_operation_back(Delay(100), [self.qubit0])
         h_gate = HGate()
         h_gate.condition = self.condition
         self.dag.apply_operation_back(HGate(), [self.qubit0])
@@ -769,6 +838,8 @@ class TestDagNodeSelection(QiskitTestCase):
     def test_dag_collect_1q_runs_with_parameterized_gate(self):
         """Test collect 1q splits on parameterized gates."""
         theta = Parameter('theta')
+        self.dag.apply_operation_back(Reset(), [self.qubit0])
+        self.dag.apply_operation_back(Delay(100), [self.qubit0])
         self.dag.apply_operation_back(HGate(), [self.qubit0])
         self.dag.apply_operation_back(HGate(), [self.qubit0])
         self.dag.apply_operation_back(U1Gate(theta), [self.qubit0])
@@ -783,6 +854,8 @@ class TestDagNodeSelection(QiskitTestCase):
 
     def test_dag_collect_1q_runs_with_cx_in_middle(self):
         """Test collect_1q_runs_with a cx in the middle of the run."""
+        self.dag.apply_operation_back(Reset(), [self.qubit0])
+        self.dag.apply_operation_back(Delay(100), [self.qubit0])
         self.dag.apply_operation_back(HGate(), [self.qubit0])
         self.dag.apply_operation_back(HGate(), [self.qubit0])
         self.dag.apply_operation_back(U1Gate(3.14), [self.qubit0])
