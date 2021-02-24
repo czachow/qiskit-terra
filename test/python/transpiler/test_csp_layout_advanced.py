@@ -18,7 +18,7 @@ from math import pi
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit.transpiler import CouplingMap
-from qiskit.transpiler.passes import CSPLayout
+from qiskit.transpiler.passes import CSPLayoutAdvanced
 from qiskit.converters import circuit_to_dag
 from qiskit.test import QiskitTestCase
 from qiskit.test.mock import FakeTenerife, FakeRueschlikon, FakeTokyo, FakeBogota, FakeMelbourne

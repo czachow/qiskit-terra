@@ -19,13 +19,11 @@ No CX direction is considered.
 import numpy as np
 from itertools import combinations
 
-from qiskit.circuit import Gate, Measure
+from qiskit.circuit import Gate
 from qiskit.transpiler.basepasses import AnalysisPass
 
 
-DEFAULT_1Q_ERROR = 5 * 10**(-3)
-DEFAULT_2Q_ERROR = 5 * 10**(-2)
-DEFAULT_MS_ERROR = 5 * 10**(-2)
+DEFAULT_CX_ERROR = 5 * 10**(-2)
 
 
 class LayoutScorer(AnalysisPass):
@@ -62,53 +60,45 @@ class LayoutScorer(AnalysisPass):
 
     def evaluate(self, dag, layout):
         """
-        Evaluate the LayoutScorer on a layout and dag.
-        Calculate the score as the product of all fidelities
+        Evaluate the score on a layout and dag.
+        Calculate the score as the product of all fidelities two qubit gate fidelities.
+        Assign an artificial fidelity to virtual gates that require swap operations in the implementation.
         Args:
             dag (DAGCircuit): DAG to evaluate
             layout (Layout): Layout to evaluate
         """
         layout_fidelity = 1.0
-        for node in dag.op_nodes(include_directives=False):
+        for node in dag.two_qubit_ops(self):
             physical_qubits = [layout[qubit] for qubit in node.qargs]
             if isinstance(node.op, Gate):
-                if len(node.qargs) == 1:
-                    layout_fidelity *= self._calculate_1q_fidelity(physical_qubits)
-                elif len(node.qargs) == 2:
-                    layout_fidelity *= self._calculate_2q_fidelity(physical_qubits)
-            elif isinstance(node.op, Measure):
-                layout_fidelity *= self._calculate_ms_fidelity(physical_qubits)
+                layout_fidelity *= self._calculate_2q_fidelity(physical_qubits)
         return layout_fidelity
 
-    def _calculate_1q_fidelity(self, qubits):
-        """Calculate the 1q fidelity"""
-        if self.backend_prop:
-            return 1 - 1/2 * (self.backend_prop.gate_error("u2", qubits) +
-                              self.backend_prop.gate_error("u3", qubits))
-        else:
-            return 1 - DEFAULT_1Q_ERROR
-
     def _calculate_2q_fidelity(self, qubits):
-        """Calculate the 2q fidelity"""
-        def tq_fidelity(qubits):
+        """Calculate the 2q fidelity
+        Depending on the distance of the qubits, there are different options
+        for introducing the additional swaps. Therefore the average over all paths is used.
+
+        As an example the fidelity for a cx-gate between qb1 and qb4 is a chain is given as:
+        f_14 = 1/3 * f_12 f_23 f_34 (f_12^5 f_23^5 + f_23^5 f_34^5 f_12^5 f_34^5)
+        """
+        def cx_fid(qubits):
             if self.backend_prop:
                 return 1 - self.backend_prop.gate_error("cx", qubits)
             else:
-                return 1 - DEFAULT_2Q_ERROR
+                return 1 - DEFAULT_CX_ERROR
 
         cplpath = self.coupling_map.shortest_undirected_path(*qubits)
         cplpath_length = len(cplpath) - 1
         cplpath_edges = [[cplpath[k], cplpath[k+1]] for k in range(cplpath_length)]
 
-        path_score = 1.0
-        for qubit_subset in combinations(cplpath_edges, cplpath_length - 1):
-            path_score *= np.prod([tq_fidelity(qubits)**5 for qubits in qubit_subset])
+        path_fid = 1.0
+        path_fid *= np.sum(
+            [np.prod(
+                [cx_fid(qubits)**5 for qubits in qubits_subset]
+                )
+                for qubits_subset in combinations(cplpath_edges, cplpath_length-1)]
+            )
+        path_fid *= np.prod([cx_fid(qubits) for qubits in cplpath_edges]) / cplpath_length
 
-        return np.prod([tq_fidelity(qubits) for qubits in cplpath_edges]) / cplpath_length * path_score
-
-    def _calculate_ms_fidelity(self, qubits):
-        """Calculate measure fidelity"""
-        if self.backend_prop:
-            return 1 - self.backend_prop.readout_error(*qubits)
-        else:
-            return 1 - DEFAULT_MS_ERROR
+        return path_fid
