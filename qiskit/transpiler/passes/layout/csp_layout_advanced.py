@@ -95,7 +95,7 @@ class CSPLayoutAdvanced(AnalysisPass):
 
             if not any(solution_list):
                 stop_reason = 'iteration limit reached'
-                if isinstance(self.csp_solver, CustomSolver):
+                if isinstance(self.csp_solver, ConstraintSolver):
                     if self.csp_solver.time_current is not None and self.csp_solver.time_current >= self.time_limit:
                         stop_reason = 'time limit reached'
                     elif self.csp_solver.call_current is not None and self.csp_solver.call_current >= self.call_limit:
