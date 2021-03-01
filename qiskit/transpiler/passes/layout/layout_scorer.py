@@ -68,7 +68,7 @@ class LayoutScorer(AnalysisPass):
             layout (Layout): Layout to evaluate
         """
         layout_fidelity = 1.0
-        for node in dag.two_qubit_ops(self):
+        for node in dag.two_qubit_ops():
             physical_qubits = [layout[qubit] for qubit in node.qargs]
             if isinstance(node.op, Gate):
                 layout_fidelity *= self._calculate_2q_fidelity(physical_qubits)
