@@ -15,17 +15,15 @@ Constraint Satisfaction Problem. It tries to find a solution that fully
 satisfy the circuit, i.e. no further swap is needed. If no solution is
 found, no ``property_set['layout']`` is set.
 """
-import random
 import warnings
 import numpy as np
+import random
 from itertools import chain
 from copy import deepcopy
-from constraint import Problem, RecursiveBacktrackingSolver, AllDifferentConstraint
-
+from qiskit.transpiler.passes.utils.constraint import Problem, RecursiveBacktrackingSolver, AllDifferentConstraint
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.basepasses import AnalysisPass
 from .layout_scorer import LayoutScorer
-from .constraint_solver import ConstraintSolver
 
 
 class CSPLayoutAdvanced(AnalysisPass):
@@ -73,11 +71,7 @@ class CSPLayoutAdvanced(AnalysisPass):
         random.seed(self.seed)
 
         self.layout_scorer = LayoutScorer(self.coupling_map, backend_prop=self.backend_prop)
-
-        if self.time_limit is None and self.call_limit is None:
-            self.csp_solver = RecursiveBacktrackingSolver()
-        else:
-            self.csp_solver = ConstraintSolver(call_limit=self.call_limit, time_limit=self.time_limit)
+        self.csp_solver = RecursiveBacktrackingSolver(call_limit=self.call_limit, time_limit=self.time_limit)
 
     def run(self, dag):
         coupling_map = deepcopy(self.coupling_map)
@@ -89,17 +83,16 @@ class CSPLayoutAdvanced(AnalysisPass):
             problem = self._get_csp_problem(dag, coupling_map)
 
             if self.solution_limit:
-                solution_list = [problem.getSolution()]
+                solution_list = [problem.get_solution()]
             else:
-                solution_list = problem.getSolutions()
+                solution_list = problem.get_solutions()
 
             if not any(solution_list):
                 stop_reason = 'iteration limit reached'
-                if isinstance(self.csp_solver, ConstraintSolver):
-                    if self.csp_solver.time_current is not None and self.csp_solver.time_current >= self.time_limit:
-                        stop_reason = 'time limit reached'
-                    elif self.csp_solver.call_current is not None and self.csp_solver.call_current >= self.call_limit:
-                        stop_reason = 'call limit reached'
+                if self.csp_solver.time_current is not None and self.csp_solver.time_current >= self.time_limit:
+                    stop_reason = 'time limit reached'
+                elif self.csp_solver.call_current is not None and self.csp_solver.call_current >= self.call_limit:
+                    stop_reason = 'call limit reached'
 
             else:
                 stop_reason = 'solution found'
@@ -122,9 +115,12 @@ class CSPLayoutAdvanced(AnalysisPass):
         physical_edges = set(coupling_map.get_edges())
 
         problem = Problem(self.csp_solver)
-        problem.addVariables(list(range(len(dag.qubits))),
-                             self.coupling_map.physical_qubits)
-        problem.addConstraint(AllDifferentConstraint())  # each wire is map to a single qbit
+
+        variables = list(range(len(dag.qubits)))
+        variable_domains = list(self.coupling_map.physical_qubits).copy()
+        random.shuffle(variable_domains)
+        problem.add_variables(variables, variable_domains)
+        problem.add_constraint(AllDifferentConstraint())  # each wire is map to a single qbit
 
         if self.strict_direction:
             def constraint(control, target):
@@ -134,7 +130,7 @@ class CSPLayoutAdvanced(AnalysisPass):
                 return (control, target) in physical_edges or (target, control) in physical_edges
 
         for edge in logical_edges:
-            problem.addConstraint(constraint, [edge[0], edge[1]])
+            problem.add_constraint(constraint, [edge[0], edge[1]])
 
         return problem
 
