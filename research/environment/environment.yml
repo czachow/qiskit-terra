@@ -1,0 +1,14 @@
+name: qiskit-terra-dev
+dependencies:
+    - python=3.8.*
+    - pip
+    - jupyter
+    - nbconvert
+    - numpy
+    - matplotlib
+    - pandas
+    - seaborn
+    - pip:
+        - qiskit-aer-gpu
+        - qiskit-ibmq-provider
+        - pyarrow
