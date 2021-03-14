@@ -9,9 +9,11 @@ circuit = generate_circuit_sub_coupling_map(backend.configuration().coupling_map
                                             [0, 1, 2, 3, 4, 10, 11, 13, 14, 15, 16, 17])
 
 for seed in range(10):
-    ideal_result = evaluate(circuit, 'csplayout', backend=backend, ideal=True,
-                            routing=False, shots=shots, seed=seed)
-    noise_result = evaluate(circuit, 'csplayout', backend=backend, ideal=False,
-                            routing=False, shots=shots, seed=seed)
+    ideal_result, ideal_time = evaluate(circuit, 'csplayout', backend=backend, ideal=True,
+                                        routing=False, shots=shots, seed=seed)
+    noise_result, noise_time = evaluate(circuit, 'csplayout', backend=backend, ideal=False,
+                                        routing=False, shots=shots, seed=seed)
     write_csv_row('exp1_csplayout.csv', {'seed': seed,
-                                         'tvd': tvd_on_result(ideal_result, noise_result)})
+                                         'tvd': tvd_on_result(ideal_result, noise_result),
+                                         'ideal_time': ideal_time,
+                                         'noise_time': noise_time})

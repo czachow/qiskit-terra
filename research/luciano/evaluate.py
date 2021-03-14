@@ -33,9 +33,16 @@ def evaluate(circuit, layout_method, backend, ideal=True, routing=True, shots=1,
         simulator = QasmSimulator.from_backend(backend)
 
     passmanager = custom_pass_manager(backend, layout, routing=routing, seed=seed)
-    qobj = assemble(passmanager.run(circuit), backend, shots=shots, seed_simulator=seed)
 
-    return simulator.run(qobj).result()
+    times = {}
+    def callback(**kwargs):
+        times[kwargs['pass_'].__class__.__name__] = kwargs['time']
+
+    transpiled = passmanager.run(circuit, callback=callback)
+
+    qobj = assemble(transpiled, backend, shots=shots, seed_simulator=seed)
+
+    return simulator.run(qobj).result(), times[layout.__class__.__name__]
 
 def tvd_on_result(ideal_result, noise_result):
     ideal_counts = ideal_result.get_counts()
