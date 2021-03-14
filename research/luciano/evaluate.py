@@ -6,7 +6,7 @@ from qiskit.providers.aer import QasmSimulator
 from custom_passmanager import custom_pass_manager
 
 
-def evaluate(circuit, layout_method, backend, ideal=True, shots=1, seed=None):
+def evaluate(circuit, layout_method, backend, ideal=True, routing=True, shots=1, seed=None):
     """
     layout_method:
       - csplayout:
@@ -32,18 +32,29 @@ def evaluate(circuit, layout_method, backend, ideal=True, shots=1, seed=None):
     else:
         simulator = QasmSimulator.from_backend(backend)
 
-    passmanager = custom_pass_manager(backend, layout, seed=seed)
-    qobj = assemble(passmanager.run(circuit), backend, shots=shots, seed=seed)
+    passmanager = custom_pass_manager(backend, layout, routing=routing, seed=seed)
+    qobj = assemble(passmanager.run(circuit), backend, shots=shots, seed_simulator=seed)
 
-    return simulator.run(qobj, seed=seed).result()
+    return simulator.run(qobj).result()
 
+def tvd_on_result(ideal_result, noise_result):
+    ideal_counts = ideal_result.get_counts()
+    for noise_count in noise_result.get_counts():
+        if noise_count not in ideal_counts:
+            ideal_counts[noise_count] = 0
 
-from qiskit.test.mock.backends import FakeManhattan
-from generate_circuits import generate_circuit_sub_coupling_map
+    noise_counts = noise_result.get_counts()
+    for ideal_count in ideal_result.get_counts():
+        if ideal_count not in noise_counts:
+            noise_counts[ideal_count] = 0
 
-backend = FakeManhattan()
-circuit = generate_circuit_sub_coupling_map(backend.configuration().coupling_map,
-                                            [0, 1, 2, 3, 4, 10, 11, 13, 14, 15, 16, 17])
+    return tvd(ideal_counts, noise_counts)
 
-noise_result = evaluate(circuit, 'csplayout', backend=backend, shots=1, seed=42)
-print(noise_result.get_counts())
+def tvd(p, q):
+    """total variation distance"""
+    list_of_diffs = []
+    for bit_string in p:
+        p_i = p[bit_string]
+        q_i = q[bit_string]
+        list_of_diffs.append(abs(p_i-q_i))
+    return sum(list_of_diffs)/2

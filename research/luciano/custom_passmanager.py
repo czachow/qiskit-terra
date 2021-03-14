@@ -10,7 +10,7 @@ from qiskit.transpiler.passes import EnlargeWithAncilla
 from qiskit.transpiler.passes import ApplyLayout
 from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary as sel
 
-def custom_pass_manager(backend, layout_instance, seed=None):
+def custom_pass_manager(backend, layout_instance, routing, seed=None):
     basis_gates = backend.configuration().basis_gates
     coupling_map = CouplingMap(backend.configuration().coupling_map)
 
@@ -27,8 +27,9 @@ def custom_pass_manager(backend, layout_instance, seed=None):
     pm = PassManager()
     pm.append(layout_instance)
     pm.append(_embed)
-    pm.append(_unroll3q)
-    pm.append(_swap_check)
-    pm.append(_swap, condition=_swap_condition)
+    if routing:
+        pm.append(_unroll3q)
+        pm.append(_swap_check)
+        pm.append(_swap, condition=_swap_condition)
     pm.append(_unroll)
     return pm
