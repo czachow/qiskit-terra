@@ -49,6 +49,7 @@ class LayoutScorer(AnalysisPass):
     def run(self, dag):
         """
         Run the LayoutScorer pass on `dag`.
+
         Args:
             dag (DAGCircuit): DAG to evaluate.
         """
@@ -59,10 +60,10 @@ class LayoutScorer(AnalysisPass):
         self.property_set[self.property_name] = layout_score
 
     def evaluate(self, dag, layout):
-        """
-        Evaluate the score on a layout and dag.
-        Calculate the score as the product of all fidelities two qubit gate fidelities.
+        """ Evaluate the score on a layout and dag. 
+        Calculate the score as the product of all two qubit gate fidelities.
         Assign an artificial fidelity to virtual gates that require swap operations in the implementation.
+
         Args:
             dag (DAGCircuit): DAG to evaluate
             layout (Layout): Layout to evaluate
@@ -79,7 +80,7 @@ class LayoutScorer(AnalysisPass):
         Depending on the distance of the qubits, there are different options
         for introducing the additional swaps. Therefore the average over all paths is used.
 
-        As an example the fidelity for a cx-gate between qb1 and qb4 is a chain is given as:
+        As an example the fidelity for a cx-gate between qb1 and qb4 in a chain is given as:
         f_14 = 1/3 * f_12 f_23 f_34 (f_12^5 f_23^5 + f_23^5 f_34^5 f_12^5 f_34^5)
         """
         def cx_fid(qubits):

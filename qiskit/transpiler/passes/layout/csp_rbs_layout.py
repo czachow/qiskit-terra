@@ -17,28 +17,31 @@ found, no ``property_set['layout']`` is set.
 """
 import warnings
 import numpy as np
-import random
 from itertools import chain
 from copy import deepcopy
-from qiskit.transpiler.passes.utils.constraint import Problem, RecursiveBacktrackingSolver, AllDifferentConstraint
+from random import Random
+from constraint import Problem, AllDifferentConstraint
+
+from qiskit.transpiler.passes.utils.constraint import RecursiveBacktrackingSolver
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.basepasses import AnalysisPass
 from .layout_scorer import LayoutScorer
 
 
-class CSPLayoutAdvanced(AnalysisPass):
+class CspRbsLayout(AnalysisPass):
     """If possible, chooses a Layout as a CSP, using backtracking."""
 
     def __init__(self, coupling_map, strict_direction=False, seed=None, call_limit=1000,
-                 time_limit=10, iteration_limit=1, solution_limit=True, backend_prop=None):
+                 time_limit=10, iteration_limit=1, solution_limit=1, backend_prop=None):
         """If possible, chooses a Layout as a CSP, using backtracking.
         If not possible, does not set the layout property. In all the cases,
         the property `CSPLayout_stop_reason` will be added with one of the
         following values:
         * solution found: If a perfect layout was found.
-        * nonexistent solution: If no perfect layout was found and every combination was checked.
         * call limit reached: If no perfect layout was found and the call limit was reached.
         * time limit reached: If no perfect layout was found and the time limit was reached.
+        * iteration limit reached: If no perfect layout was found and the iteration limit was reached.
+
         Args:
             coupling_map (Coupling): Directed graph representing a coupling map.
             strict_direction (bool): If True, considers the direction of the coupling map.
@@ -50,10 +53,10 @@ class CSPLayoutAdvanced(AnalysisPass):
             time_limit (int): Amount of seconds that the pass will try to find a solution.
                 None means no time limit. Default: 10 seconds.
             iteration_limit (int): Amount of iterations to do with introduction of virtual edges
-            solution_limit (bool): Limit the number of solution, when true only obtain
-                one solution from solver. Default: True.
+            solution_limit (int): Limit the number of solution to the given number. Default: 10.
             backend_prop (BackendProp): The properties of the backend, needed if solution_limit
-                is turned off and a solution needs to be picked from the bunch. Default: None.
+                or iteration_limit exist and a solution needs to be picked from the bunch. 
+                Default: None.
         Raises:
             Warning: "Can only check multiple solutions when backend properties are given. \
                       Defaulting to limiting solutions!"
@@ -61,42 +64,53 @@ class CSPLayoutAdvanced(AnalysisPass):
         super().__init__()
         self.coupling_map = coupling_map
         self.strict_direction = strict_direction
+
         self.call_limit = call_limit
         self.time_limit = time_limit
         self.iteration_limit = iteration_limit
         self.solution_limit = solution_limit
+
         self.backend_prop = backend_prop
         self.seed = seed
 
-        random.seed(self.seed)
-
-        self.layout_scorer = LayoutScorer(self.coupling_map, backend_prop=self.backend_prop)
-        self.csp_solver = RecursiveBacktrackingSolver(call_limit=self.call_limit, time_limit=self.time_limit)
+        # init scorer and solver
+        self.layout_scorer = LayoutScorer(self.coupling_map,
+                                          backend_prop=self.backend_prop)
+        self.csp_solver = RecursiveBacktrackingSolver(call_limit=self.call_limit,
+                                                      time_limit=self.time_limit,
+                                                      solution_limit=self.solution_limit)
 
     def run(self, dag):
+        # copy required as map will be manipulated
         coupling_map = deepcopy(self.coupling_map)
         logical_qubits = dag.qubits
 
+        # iterate of different level
         for it_level in range(self.iteration_limit):
             if it_level > 0:
                 coupling_map = self._extend_coupling_map(coupling_map)
             problem = self._get_csp_problem(dag, coupling_map)
 
-            if self.solution_limit:
-                solution_list = [problem.get_solution()]
-            else:
-                solution_list = problem.get_solutions()
+            solution_list = problem.getSolutions()
 
+            # solution_list is empty
             if not any(solution_list):
                 stop_reason = 'iteration limit reached'
-                if self.csp_solver.time_current is not None and self.csp_solver.time_current >= self.time_limit:
+                if (
+                    self.csp_solver.time_current is not None and
+                    self.csp_solver.time_current >= self.time_limit
+                ):
                     stop_reason = 'time limit reached'
-                elif self.csp_solver.call_current is not None and self.csp_solver.call_current >= self.call_limit:
+                elif (
+                    self.csp_solver.call_current is not None and
+                    self.csp_solver.call_current >= self.call_limit
+                ):
                     stop_reason = 'call limit reached'
 
+            # solution_list has entries
             else:
                 stop_reason = 'solution found'
-                if self.solution_limit:
+                if self.solution_limit == 1:
                     solution = solution_list[0]
                 else:
                     sol_layouts = [Layout({v: logical_qubits[k] for k, v in solution.items()})
@@ -118,9 +132,10 @@ class CSPLayoutAdvanced(AnalysisPass):
 
         variables = list(range(len(dag.qubits)))
         variable_domains = list(self.coupling_map.physical_qubits).copy()
-        random.shuffle(variable_domains)
-        problem.add_variables(variables, variable_domains)
-        problem.add_constraint(AllDifferentConstraint())  # each wire is map to a single qbit
+        Random(self.seed).shuffle(variable_domains)
+
+        problem.addVariables(variables, variable_domains)
+        problem.addConstraint(AllDifferentConstraint())  # each wire is map to a single qbit
 
         if self.strict_direction:
             def constraint(control, target):
@@ -130,7 +145,7 @@ class CSPLayoutAdvanced(AnalysisPass):
                 return (control, target) in physical_edges or (target, control) in physical_edges
 
         for edge in logical_edges:
-            problem.add_constraint(constraint, [edge[0], edge[1]])
+            problem.addConstraint(constraint, [edge[0], edge[1]])
 
         return problem
 
