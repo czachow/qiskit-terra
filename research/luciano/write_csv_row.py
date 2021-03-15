@@ -1,6 +1,18 @@
 import csv
 from os.path import isfile
 
+"""
+{'seed': seed,
+ 'ideal': {
+    'time',
+    counts_dict'},
+ 'noise': {
+    'time',
+    counts_dict'}
+}
+"""
+
+
 def write_csv_row(filename, row_dict):
     header = not isfile(filename)
 
