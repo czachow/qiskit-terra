@@ -42,6 +42,7 @@ def evaluate(circuit, layout_method, backend, ideal=True, routing=True, shots=1,
 
     return simulator.run(qobj).result(), times[layout.__class__.__name__]
 
+
 def tvd_on_result(ideal_result, noise_result):
     ideal_counts = ideal_result.get_counts()
     for noise_count in noise_result.get_counts():
@@ -54,6 +55,7 @@ def tvd_on_result(ideal_result, noise_result):
             noise_counts[ideal_count] = 0
 
     return tvd(ideal_counts, noise_counts)
+
 
 def tvd(p, q):
     """total variation distance"""

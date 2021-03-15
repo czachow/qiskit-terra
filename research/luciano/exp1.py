@@ -19,8 +19,8 @@ def exp1(layout_method):
                                              'ideal_time': ideal_time,
                                              'noise_time': noise_time})
 
-
-# exp1('csplayout')
+exp1('advance_csplayout')
+exp1('csplayout')
 exp1('dense')
-# exp1('noise_adaptive')
-# exp1('sabre')
+exp1('noise_adaptive')
+exp1('sabre')
