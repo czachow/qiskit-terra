@@ -1,12 +1,12 @@
 from qiskit import assemble
 from qiskit.transpiler import CouplingMap
-from qiskit.transpiler.passes import CSPLayout, TrivialLayout, DenseLayout, NoiseAdaptiveLayout, \
+from qiskit.transpiler.passes import CSPLayout, DenseLayout, NoiseAdaptiveLayout, \
     SabreLayout
 from qiskit.providers.aer import QasmSimulator
 from custom_passmanager import custom_pass_manager
 
 
-def evaluate(circuit, layout_method, backend, ideal=True, routing=True, shots=1, seed=None):
+def evaluate(circuit, layout_method, backend, ideal=True, shots=1, seed=None):
     """
     layout_method:
       - csplayout:
@@ -26,21 +26,25 @@ def evaluate(circuit, layout_method, backend, ideal=True, routing=True, shots=1,
         raise Exception('layout_method unknown %s' % layout_method)
 
     if ideal:
-        simulator = QasmSimulator()
+        simulator = QasmSimulator(method='matrix_product_state')
     else:
-        simulator = QasmSimulator.from_backend(backend)
+        simulator = QasmSimulator.from_backend(backend, method='matrix_product_state')
 
-    passmanager = custom_pass_manager(backend, layout, routing=routing, seed=seed)
+    passmanager = custom_pass_manager(backend, layout, seed=seed)
 
     times = {}
+    count_ops_after_map = {}
     def callback(**kwargs):
         times[kwargs['pass_'].__class__.__name__] = kwargs['time']
+        if kwargs['pass_'].__class__.__name__ == 'StochasticSwap':
+            count_ops_after_map.update(kwargs['dag'].count_ops())
 
     transpiled = passmanager.run(circuit, callback=callback)
+    needed_swaps = 0 if passmanager.property_set['is_swap_mapped'] else count_ops_after_map['swap']
 
     qobj = assemble(transpiled, backend, shots=shots, seed_simulator=seed)
 
-    return simulator.run(qobj).result(), times[layout.__class__.__name__]
+    return simulator.run(qobj).result(), times[layout.__class__.__name__], needed_swaps
 
 
 def tvd_on_result(ideal_result, noise_result):
@@ -63,5 +67,5 @@ def tvd(p, q):
     for bit_string in p:
         p_i = p[bit_string]
         q_i = q[bit_string]
-        list_of_diffs.append(abs(p_i-q_i))
-    return sum(list_of_diffs)/2
+        list_of_diffs.append(abs(p_i - q_i))
+    return sum(list_of_diffs) / 2
