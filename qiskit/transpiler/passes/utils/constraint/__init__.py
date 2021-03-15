@@ -11,3 +11,4 @@
 # that they have been altered from the originals.
 
 from .recursive_backtracking_solver import RecursiveBacktrackingSolver
+from .least_conflict_solver import LeastConflictsSolver
