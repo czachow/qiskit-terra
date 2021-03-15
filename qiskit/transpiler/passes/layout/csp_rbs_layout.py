@@ -120,8 +120,8 @@ class CspRbsLayout(AnalysisPass):
                     solution = solution_list[max_fid_idx]
 
                 self.property_set['layout'] = Layout({v: logical_qubits[k] for k, v in solution.items()})
-
-            self.property_set['CSPLayout_stop_reason'] = stop_reason
+                self.property_set['CSPLayout_stop_reason'] = stop_reason
+                break
 
     def _get_csp_problem(self, dag, coupling_map):
         """ Create a CSP Problem """
