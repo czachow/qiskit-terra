@@ -3,14 +3,12 @@ from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes import CSPLayout, DenseLayout, NoiseAdaptiveLayout, \
     SabreLayout
 from qiskit.providers.aer import QasmSimulator
+from qiskit.providers.aer.noise import NoiseModel
+
 from custom_passmanager import custom_pass_manager
 
 
 def evaluate(circuit, layout_method, backend, ideal=True, shots=1, seed=None):
-    """
-    layout_method:
-      - csplayout:
-    """
     coupling_map = CouplingMap(backend.configuration().coupling_map)
     backend_properties = backend.properties()
 
@@ -26,9 +24,12 @@ def evaluate(circuit, layout_method, backend, ideal=True, shots=1, seed=None):
         raise Exception('layout_method unknown %s' % layout_method)
 
     if ideal:
-        simulator = QasmSimulator(method='matrix_product_state')
+        simulator = QasmSimulator(configuration=backend.configuration(), method='stabilizer')
     else:
-        simulator = QasmSimulator.from_backend(backend, method='matrix_product_state')
+        noise_model = NoiseModel.from_backend(backend, thermal_relaxation=False)
+        simulator = QasmSimulator(configuration=backend.configuration(),
+                                  noise_model=noise_model,
+                                  method='stabilizer')
 
     passmanager = custom_pass_manager(backend, layout, seed=seed)
 
@@ -40,6 +41,7 @@ def evaluate(circuit, layout_method, backend, ideal=True, shots=1, seed=None):
             count_ops_after_map.update(kwargs['dag'].count_ops())
 
     transpiled = passmanager.run(circuit, callback=callback)
+
     needed_swaps = 0 if passmanager.property_set['is_swap_mapped'] else count_ops_after_map['swap']
 
     qobj = assemble(transpiled, backend, shots=shots, seed_simulator=seed)

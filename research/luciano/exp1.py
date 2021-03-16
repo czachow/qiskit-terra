@@ -2,10 +2,15 @@ from qiskit.test.mock.backends import FakeManhattan
 from generate_circuits import generate_circuit_sub_coupling_map
 from evaluate import evaluate, tvd_on_result
 from write_csv_row import write_csv_row
+from qiskit import IBMQ
 
-shots = 8192
+IBMQ.load_account()
+provider = IBMQ.get_provider(hub='ibm-q-internal', group='deployed', project='default')
+backend = provider.get_backend('ibmq_manhattan')
+
+shots = 2048
 samples = 10
-backend = FakeManhattan()
+
 circuit = generate_circuit_sub_coupling_map(backend.configuration().coupling_map,
                                             [0, 1, 2, 3, 4, 10, 11, 13, 14, 15, 16, 17])
 
@@ -18,7 +23,9 @@ def exp1(layout_method):
             circuit, layout_method, backend=backend, ideal=False, shots=shots, seed=seed)
         write_csv_row(f'exp1_{layout_method}.csv',
                       {'seed': seed,
-                       'tvd': tvd_on_result(ideal_result, noise_result),
+                       # 'tvd': tvd_on_result(ideal_result, noise_result),
+                       'ideal_result': ideal_result.get_counts(),
+                       'noise_result': noise_result.get_counts(),
                        'ideal_time': ideal_time,
                        'noise_time': noise_time,
                        'swaps_needed_ideal': swaps_needed_ideal,
