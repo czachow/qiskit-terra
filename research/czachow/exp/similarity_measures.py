@@ -1,4 +1,4 @@
-
+import math
 
 def hellinger_distance(p, q):
     """Hellinger distance between two discrete distributions."""
