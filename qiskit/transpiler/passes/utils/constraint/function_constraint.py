@@ -10,6 +10,9 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+from .constraint import Constraint
+from .variable import Unassigned
+
 
 class FunctionConstraint(Constraint):
     """

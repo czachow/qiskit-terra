@@ -20,9 +20,8 @@ import numpy as np
 from itertools import chain
 from copy import deepcopy
 from random import Random
-from constraint import Problem, AllDifferentConstraint
 
-from qiskit.transpiler.passes.utils.constraint import RecursiveBacktrackingSolver
+from qiskit.transpiler.passes.utils.constraint import Problem, AllDifferentConstraint, RecursiveBacktrackingSolver
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.basepasses import AnalysisPass
 from .layout_scorer import LayoutScorer

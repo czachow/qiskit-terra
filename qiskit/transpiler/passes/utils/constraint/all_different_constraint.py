@@ -12,6 +12,7 @@
 
 
 from .constraint import Constraint
+from .variable import Unassigned
 
 
 class AllDifferentConstraint(Constraint):
