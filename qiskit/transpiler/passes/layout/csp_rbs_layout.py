@@ -75,11 +75,12 @@ class CspRbsLayout(AnalysisPass):
         # init scorer and solver
         self.layout_scorer = LayoutScorer(self.coupling_map,
                                           backend_prop=self.backend_prop)
+
+    def run(self, dag):
         self.csp_solver = RecursiveBacktrackingSolver(call_limit=self.call_limit,
                                                       time_limit=self.time_limit,
                                                       solution_limit=self.solution_limit)
 
-    def run(self, dag):
         # copy required as map will be manipulated
         coupling_map = deepcopy(self.coupling_map)
         logical_qubits = dag.qubits
@@ -92,35 +93,38 @@ class CspRbsLayout(AnalysisPass):
 
             solution_list = problem.getSolutions()
 
-            # solution_list is empty
-            if not any(solution_list):
-                stop_reason = 'iteration limit reached'
-                if (
-                    self.csp_solver.time_current is not None and
-                    self.csp_solver.time_current >= self.time_limit
-                ):
-                    stop_reason = 'time limit reached'
-                elif (
-                    self.csp_solver.call_current is not None and
-                    self.csp_solver.call_current >= self.call_limit
-                ):
-                    stop_reason = 'call limit reached'
-
-            # solution_list has entries
-            else:
+            if solution_list:
+                # solution_list has entries
                 stop_reason = 'solution found'
                 if self.solution_limit == 1:
                     solution = solution_list[0]
                 else:
                     sol_layouts = [Layout({v: logical_qubits[k] for k, v in solution.items()})
-                                                                for solution in solution_list]
-                    layout_fidelities = [self.layout_scorer.evaluate(dag, layout) for layout in sol_layouts]
+                                   for solution in solution_list]
+                    layout_fidelities = [self.layout_scorer.evaluate(dag, layout) for layout in
+                                         sol_layouts]
                     max_fid_idx = np.argsort(layout_fidelities)[-1]
                     solution = solution_list[max_fid_idx]
 
-                self.property_set['layout'] = Layout({v: logical_qubits[k] for k, v in solution.items()})
+                self.property_set['layout'] = Layout(
+                    {v: logical_qubits[k] for k, v in solution.items()})
                 self.property_set['CSPLayout_stop_reason'] = stop_reason
                 break
+
+        # solution_list is empty
+        if not any(solution_list):
+            stop_reason = 'iteration limit reached'
+            if (
+                self.csp_solver.time_current is not None and
+                self.csp_solver.time_current >= self.time_limit
+            ):
+                stop_reason = 'time limit reached'
+            elif (
+                self.csp_solver.call_current is not None and
+                self.csp_solver.call_current >= self.call_limit
+            ):
+                stop_reason = 'call limit reached'
+        self.property_set['CSPLayout_stop_reason'] = stop_reason
 
     def _get_csp_problem(self, dag, coupling_map):
         """ Create a CSP Problem """
