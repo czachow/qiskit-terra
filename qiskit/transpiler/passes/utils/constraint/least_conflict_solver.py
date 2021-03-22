@@ -57,7 +57,7 @@ class LeastConflictsSolver(Solver):
         # Initial assignment
         for variable in domains:
             assignments[variable] = random.choice(domains[variable])
-        for _ in xrange(self._steps):
+        for _ in range(self._steps):
             conflicted = 0
             lst = list(domains.keys())
             random.shuffle(lst)
@@ -66,7 +66,10 @@ class LeastConflictsSolver(Solver):
                 # Check if variable is not in conflict
                 for constraint, variables in vconstraints[variable]:
                     if not constraint(variables, domains, assignments):
-                        conflicted += 1
+                        if constraint.hard:
+                            conflicted = float('inf')
+                        else:
+                            conflicted += 1
                 # Variable has conflicts. Save it:
                 if conflicted > 0 and conflicted_var is None:
                     conflicted_var = variable
