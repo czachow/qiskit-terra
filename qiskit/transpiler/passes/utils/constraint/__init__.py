@@ -10,4 +10,12 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+from .variable import Variable
+from .domain import Domain
+from .prolem import Problem
+from .constraint import Constraint
+from .function_constraint import FunctionConstraint
+from .all_different_constraint import AllDifferentConstraint
+
 from .recursive_backtracking_solver import RecursiveBacktrackingSolver
+from .least_conflict_solver import LeastConflictsSolver
