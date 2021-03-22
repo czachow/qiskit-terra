@@ -120,7 +120,7 @@ class Problem(object):
         for variable in variables:
             self.addVariable(variable, domain)
 
-    def addConstraint(self, constraint, variables=None):
+    def addConstraint(self, constraint, variables=None, hard=True):
         """
         Add a constraint to the problem
         Example:
@@ -139,10 +139,11 @@ class Problem(object):
         """
         if not isinstance(constraint, Constraint):
             if callable(constraint):
-                constraint = FunctionConstraint(constraint)
+                constraint = FunctionConstraint(constraint, hard)
             else:
                 msg = "Constraints must be instances of subclasses " "of the Constraint class"
                 raise ValueError(msg)
+        constraint.hard = hard
         self._constraints.append((constraint, variables))
 
     def getSolution(self):

@@ -34,7 +34,7 @@ class FunctionConstraint(Constraint):
     {'a': 1, 'b': 2}
     """
 
-    def __init__(self, func, assigned=True, hard=False):
+    def __init__(self, func, assigned=True, hard=True):
         """
         @param func: Function wrapped and queried for constraint logic
         @type  func: callable object

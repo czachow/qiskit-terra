@@ -71,7 +71,7 @@ class LCSLayout(AnalysisPass):
 
         problem = Problem(solver)
         problem.addVariables(variables, variable_domains)
-        problem.addConstraint(AllDifferentConstraint(), hard=True)  # each wire is map to a single qubit
+        problem.addConstraint(AllDifferentConstraint())  # each wire is map to a single qubit
 
         if self.strict_direction:
             def constraint(control, target):
@@ -81,7 +81,7 @@ class LCSLayout(AnalysisPass):
                 return (control, target) in edges or (target, control) in edges
 
         for pair in cxs:
-            problem.addConstraint(constraint, [pair[0], pair[1]])
+            problem.addConstraint(constraint, [pair[0], pair[1]], hard=False)
 
         solution = problem.getSolution()
 
