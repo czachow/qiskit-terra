@@ -23,7 +23,7 @@ class LCSLayout(AnalysisPass):
     """If possible, chooses a Layout using a Least Conflict Solver."""
 
     def __init__(self, coupling_map, strict_direction=False, seed=None, call_limit=1000,
-                 time_limit=10):
+                 time_limit=10, steps=1000):
         """If possible, chooses a Layout as a CSP, using backtracking.
 
         If not possible, does not set the layout property. In all the cases,
@@ -52,6 +52,7 @@ class LCSLayout(AnalysisPass):
         self.call_limit = call_limit
         self.time_limit = time_limit
         self.seed = seed
+        self.steps = steps
 
     def run(self, dag):
         """ run the layout method """
@@ -63,7 +64,7 @@ class LCSLayout(AnalysisPass):
                      qubits.index(gate.qargs[1])))
         edges = set(self.coupling_map.get_edges())
 
-        solver = LeastConflictsSolver(seed=self.seed)
+        solver = LeastConflictsSolver(steps=self.steps, seed=self.seed)
 
         variables = list(range(len(qubits)))
         variable_domains = list(self.coupling_map.physical_qubits)
