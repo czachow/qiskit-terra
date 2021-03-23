@@ -19,6 +19,7 @@ from .noise_adaptive_layout import NoiseAdaptiveLayout
 from .sabre_layout import SabreLayout
 from .csp_layout import CSPLayout
 from .lcs_layout import LCSLayout
+from .mcmc_layout import MCMCLayout
 from .csp_rbs_layout import CspRbsLayout
 from .apply_layout import ApplyLayout
 from .layout_2q_distance import Layout2qDistance

@@ -19,3 +19,4 @@ from .all_different_constraint import AllDifferentConstraint
 
 from .recursive_backtracking_solver import RecursiveBacktrackingSolver
 from .least_conflict_solver import LeastConflictsSolver
+from .mcmc_solver import MonteCarloMarkowChainSolver
