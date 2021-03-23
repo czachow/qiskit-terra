@@ -71,7 +71,7 @@ class CspRbsLayout(AnalysisPass):
         self.backend_prop = backend_prop
         self.seed = seed
         
-        self.iteration_limit = self._calc_iteration_limit()
+        self.iteration_limit = None
 
         # init scorer and solver
         self.layout_scorer = LayoutScorer(self.coupling_map,
@@ -81,6 +81,7 @@ class CspRbsLayout(AnalysisPass):
         self.csp_solver = RecursiveBacktrackingSolver(call_limit=self.call_limit,
                                                       time_limit=self.time_limit,
                                                       solution_limit=self.solution_limit)
+        self.iteration_limit = len(dag.qubits)
 
         # copy required as map will be manipulated
         coupling_map = deepcopy(self.coupling_map)
@@ -181,13 +182,3 @@ class CspRbsLayout(AnalysisPass):
             logical_edges.add((dag.qubits.index(gate.qargs[0]),
                                dag.qubits.index(gate.qargs[1])))
         return logical_edges
-
-    def _calc_iteration_limit(self):
-        """ Calculate the iteration limit """
-        # calculate graph degrees
-        graph_degree = [0] * self.coupling_map.size()
-        for idx, node in enumerate(self.coupling_map.graph.node_indexes()):
-            graph_degree[idx] = min(self.coupling_map.graph.in_degree(node), 
-                                    self.coupling_map.graph.out_degree(node))
-        
-        return self.coupling_map.size() - 1 - min(graph_degree)
