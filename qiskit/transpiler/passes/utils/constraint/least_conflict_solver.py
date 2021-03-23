@@ -42,25 +42,27 @@ class LeastConflictsSolver(Solver):
     NotImplementedError: LeastConflictsSolver doesn't provide iteration
     """
 
-    def __init__(self, steps=1000):
+    def __init__(self, steps=1000, seed=None):
         """
         @param steps: Maximum number of steps to perform before giving up
                       when looking for a solution (default is 1000)
         @type  steps: int
         """
         self._steps = steps
+        self._seed = seed
 
     def getSolution(self, domains, constraints, vconstraints):
         assignments = {}
         best_assign = {}
         best_conflicted = float('inf')
+        rd_gen = random.Random(self._seed)
         # Initial assignment
         for variable in domains:
-            assignments[variable] = random.choice(domains[variable])
+            assignments[variable] = rd_gen.choice(domains[variable])
         for _ in range(self._steps):
             conflicted = 0
             lst = list(domains.keys())
-            random.shuffle(lst)
+            rd_gen.shuffle(lst)
             conflicted_var = None
             for variable in lst:
                 # Check if variable is not in conflict
@@ -94,5 +96,5 @@ class LeastConflictsSolver(Solver):
                     del minvalues[:]
                     minvalues.append(value)
             # Pick a random one from these values.
-            assignments[conflicted_var] = random.choice(minvalues)
+            assignments[conflicted_var] = rd_gen.choice(minvalues)
         return best_assign

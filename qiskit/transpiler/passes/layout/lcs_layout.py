@@ -63,7 +63,7 @@ class LCSLayout(AnalysisPass):
                      qubits.index(gate.qargs[1])))
         edges = set(self.coupling_map.get_edges())
 
-        solver = LeastConflictsSolver()
+        solver = LeastConflictsSolver(seed=self.seed)
 
         variables = list(range(len(qubits)))
         variable_domains = list(self.coupling_map.physical_qubits)

@@ -11,7 +11,7 @@ from qiskit.transpiler.passes import ApplyLayout
 from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary as sel
 
 
-def custom_pass_manager(backend, layout_instance, layout_reps=1, seed=None):
+def custom_pass_manager(backend, layout_instance, layout_reps=1):
     # basis_gates = backend.configuration().basis_gates
     basis_gates = ['s', 'sdg', 'sx', 'h', 'cx']
     coupling_map = CouplingMap(backend.configuration().coupling_map)
