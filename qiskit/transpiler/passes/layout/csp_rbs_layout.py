@@ -31,7 +31,7 @@ class CspRbsLayout(AnalysisPass):
     """If possible, chooses a Layout as a CSP, using backtracking."""
 
     def __init__(self, coupling_map, strict_direction=False, seed=None, call_limit=1000,
-                 time_limit=10, iteration_limit=1, solution_limit=1, backend_prop=None):
+                 time_limit=10, solution_limit=1, backend_prop=None):
         """If possible, chooses a Layout as a CSP, using backtracking.
         If not possible, does not set the layout property. In all the cases,
         the property `CSPLayout_stop_reason` will be added with one of the
@@ -66,11 +66,12 @@ class CspRbsLayout(AnalysisPass):
 
         self.call_limit = call_limit
         self.time_limit = time_limit
-        self.iteration_limit = iteration_limit
         self.solution_limit = solution_limit
 
         self.backend_prop = backend_prop
         self.seed = seed
+        
+        self.iteration_limit = self._calc_iteration_limit()
 
         # init scorer and solver
         self.layout_scorer = LayoutScorer(self.coupling_map,
@@ -176,3 +177,13 @@ class CspRbsLayout(AnalysisPass):
             logical_edges.add((dag.qubits.index(gate.qargs[0]),
                                dag.qubits.index(gate.qargs[1])))
         return logical_edges
+
+    def _calc_iteration_limit(self):
+        """ Calculate the iteration limit """
+        # calculate graph degrees
+        graph_degree = [0] * self.coupling_map.size()
+        for idx, node in enumerate(self.coupling_map.graph.node_indexes()):
+            graph_degree[idx] = min(self.coupling_map.graph.in_degree(node), 
+                                    self.coupling_map.graph.out_degree(node))
+        
+        return self.coupling_map.size() - 1 - min(graph_degree)

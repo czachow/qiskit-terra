@@ -95,7 +95,6 @@ class TestCspRbsLayout(QiskitTestCase):
 
         pass_ = CspRbsLayout(coupling_map,
                              seed=self.seed,
-                             iteration_limit=2,
                              solution_limit=1)
 
         pass_.run(dag)
@@ -125,7 +124,6 @@ class TestCspRbsLayout(QiskitTestCase):
 
         pass_ = CspRbsLayout(coupling_map,
                              seed=self.seed,
-                             iteration_limit=2,
                              solution_limit=5,
                              backend_prop=backend_prop)
         pass_.run(dag)
