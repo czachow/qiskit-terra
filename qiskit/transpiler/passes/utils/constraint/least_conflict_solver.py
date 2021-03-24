@@ -70,12 +70,14 @@ class LeastConflictsSolver(Solver):
                     if not constraint(variables, domains, assignments):
                         if constraint.hard:
                             conflicted = float('inf')
+                            break
                         else:
                             conflicted += 1
                 # Variable has conflicts. Save it:
                 if conflicted > 0 and conflicted_var is None:
                     conflicted_var = variable
             if conflicted == 0:
+                print('perfect', conflicted)
                 return assignments
             if best_conflicted > conflicted:
                 best_assign = assignments
@@ -88,7 +90,13 @@ class LeastConflictsSolver(Solver):
                 count = 0
                 for constraint, variables in vconstraints[conflicted_var]:
                     if not constraint(variables, domains, assignments):
-                        count += 1
+                        if constraint.hard:
+                            count = float('inf')
+                            break
+                        else:
+                            count += 1
+                if count == float('inf'):
+                    continue
                 if count == mincount:
                     minvalues.append(value)
                 elif count < mincount:
@@ -96,5 +104,7 @@ class LeastConflictsSolver(Solver):
                     del minvalues[:]
                     minvalues.append(value)
             # Pick a random one from these values.
-            assignments[conflicted_var] = rd_gen.choice(minvalues)
+            if minvalues:
+                assignments[conflicted_var] = rd_gen.choice(minvalues)
+        print('best_conflicted', best_conflicted)
         return best_assign
