@@ -73,16 +73,16 @@ class MonteCarloMarkowChainSolver(Solver):
             assignment[var] = self.rnd_gen.choice(domains[var])
         for _ in range(self.iteration_limit):
             if self.rnd_gen.random() < self.decision_probability:
-                assignment = self.metropolis_move(domains, constraints, assignment, current_temp)
+                assignment = self.metropolis_move(domains, constraints, vconstraints, assignment, current_temp)
             else:
-                assignment = self.local_move(domains, constraints, assignment)
-            objective = self.calculate_objective(domains, constraints, assignment)
+                assignment = self.local_move(domains, constraints, vconstraints, assignment)
+            objective = self.calculate_objective(domains, constraints, vconstraints, assignment)
             if np.isclose(objective, 0.0):
                 break
             current_temp = current_temp - self.initial_temp / self.iteration_limit
         return assignment, objective
 
-    def metropolis_move(self, domains, constraints, assignment, temperature):
+    def metropolis_move(self, domains, constraints, vconstraints, assignment, temperature):
         """
         """
         variables = list(domains.keys())
@@ -90,31 +90,33 @@ class MonteCarloMarkowChainSolver(Solver):
         new_assignment = assignment.copy()
         new_assignment[var] = self.rnd_gen.choice(domains[var])
 
-        old_obj = self.calculate_objective(domains, constraints, assignment)
-        new_obj = self.calculate_objective(domains, constraints, new_assignment)
+        old_obj = self.calculate_partial_objective(var, domains, constraints, vconstraints, assignment)
+        new_obj = self.calculate_partial_objective(var, domains, constraints, vconstraints, new_assignment)
 
         if np.log(self.rnd_gen.random()) < -(new_obj - old_obj) / temperature:
             return new_assignment
         else:
             return assignment
 
-    def local_move(self, domains, constraints, assignment):
+    def local_move(self, domains, constraints, vconstraints, assignment):
         """
         """
-        broken_constraints = self.get_broken_constraints(domains, constraints, assignment)
-        if broken_constraints:
+        broken_constraints = self.get_broken_constraints(domains, constraints, vconstraints, assignment)
+        if not broken_constraints:
+            return assignment
+        else:
             (_, chosen_variables) = self.rnd_gen.choice(broken_constraints)
             objective = float('inf')
             for var in chosen_variables:
                 new_assignment = assignment.copy()
                 new_assignment[var] = self.rnd_gen.choice(domains[var])
-                new_objective = self.calculate_objective(domains, constraints, assignment)
+                new_objective = self.calculate_partial_objective(var, domains, constraints, vconstraints, assignment)
                 if new_objective < objective:
                     assignment = new_assignment
                     objective = new_objective
-        return assignment
+            return assignment
 
-    def get_broken_constraints(self, domains, constraints, assignment):
+    def get_broken_constraints(self, domains, constraints, vconstraints, assignment):
         """
         """
         broken_constraints = [(None, None)] * len(constraints)
@@ -122,8 +124,16 @@ class MonteCarloMarkowChainSolver(Solver):
             if not constraint(variables, domains, assignment):
                 broken_constraints[idx] = (constraint, variables)
         return list(filter(lambda sub: not all(ele == None for ele in sub), broken_constraints))
+
+    def calculate_partial_objective(self, variable, domains, constraints, vconstraints, assignment):
+        """
+        """
+        part_obj = 0
+        for constraint, variables in vconstraints[variable]:
+            part_obj += self.constraint_to_objective_callback(domains, constraint, variables, assignment)
+        return part_obj
         
-    def calculate_objective(self, domains, constraints, assignment):
+    def calculate_objective(self, domains, constraints, vconstraints, assignment):
         """
             Maybe find more efficient way
         """

@@ -66,9 +66,9 @@ class TestMCMCLayout(QiskitTestCase):
         pass_.run(dag)
         layout = pass_.property_set['layout']
 
-        self.assertEqual(layout[qr[0]], 2)
-        self.assertEqual(layout[qr[1]], 1)
-        self.assertEqual(layout[qr[2]], 0)
+        self.assertEqual(layout[qr[0]], 4)
+        self.assertEqual(layout[qr[1]], 3)
+        self.assertEqual(layout[qr[2]], 2)
         self.assertEqual(pass_.property_set['MCMCLayout_stop_reason'], 'solution found')
 
     def test_9q_circuit_16q_coupling(self):
@@ -91,15 +91,15 @@ class TestMCMCLayout(QiskitTestCase):
         pass_.run(dag)
         layout = pass_.property_set['layout']
 
-        self.assertEqual(layout[qr0[0]], 13)
-        self.assertEqual(layout[qr0[1]], 6)
-        self.assertEqual(layout[qr0[2]], 7)
-        self.assertEqual(layout[qr0[3]], 12)
+        self.assertEqual(layout[qr0[0]], 10)
+        self.assertEqual(layout[qr0[1]], 5)
+        self.assertEqual(layout[qr0[2]], 12)
+        self.assertEqual(layout[qr0[3]], 1)
         self.assertEqual(layout[qr1[0]], 2)
-        self.assertEqual(layout[qr1[1]], 1)
-        self.assertEqual(layout[qr1[2]], 9)
-        self.assertEqual(layout[qr1[3]], 4)
-        self.assertEqual(layout[qr1[4]], 10)
+        self.assertEqual(layout[qr1[1]], 4)
+        self.assertEqual(layout[qr1[2]], 3)
+        self.assertEqual(layout[qr1[3]], 9)
+        self.assertEqual(layout[qr1[4]], 13)
         self.assertEqual(pass_.property_set['MCMCLayout_stop_reason'], 'solution found')
         
     def test_3q_circuit_5q_coupling_broken(self):
@@ -122,8 +122,8 @@ class TestMCMCLayout(QiskitTestCase):
         pass_.run(dag)
         layout = pass_.property_set['layout']
 
-        self.assertEqual(layout[qr[0]], 4)
-        self.assertEqual(layout[qr[1]], 3)
+        self.assertEqual(layout[qr[0]], 0)
+        self.assertEqual(layout[qr[1]], 1)
         self.assertEqual(layout[qr[2]], 2)
         self.assertEqual(pass_.property_set['MCMCLayout_stop_reason'], 'solution found')
 
