@@ -23,6 +23,7 @@ from .mcio_layout import MCIOLayout
 from .mcmc_layout import MCMCLayout
 from .csp_rbs_layout import CspRbsLayout
 from .apply_layout import ApplyLayout
+from .layout_scorer import LayoutScorer
 from .layout_2q_distance import Layout2qDistance
 from .enlarge_with_ancilla import EnlargeWithAncilla
 from .full_ancilla_allocation import FullAncillaAllocation

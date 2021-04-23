@@ -13,14 +13,16 @@
 """Test the CSPLayout pass"""
 
 import unittest
+import numpy as np
 from time import process_time
 
 from qiskit import QuantumRegister, QuantumCircuit
 from qiskit.transpiler import CouplingMap
+from qiskit.circuit.library import GraphState
 from qiskit.transpiler.passes.layout import MCMCLayout
 from qiskit.converters import circuit_to_dag
 from qiskit.test import QiskitTestCase
-from qiskit.test.mock import FakeTenerife, FakeRueschlikon, FakeTokyo, FakeBogota
+from qiskit.test.mock import FakeTenerife, FakeRueschlikon, FakeTokyo, FakeBogota, FakeManhattan
 
 
 class TestMCMCLayout(QiskitTestCase):
@@ -125,6 +127,26 @@ class TestMCMCLayout(QiskitTestCase):
         self.assertEqual(layout[qr[0]], 0)
         self.assertEqual(layout[qr[1]], 1)
         self.assertEqual(layout[qr[2]], 2)
+        self.assertEqual(pass_.property_set['MCMCLayout_stop_reason'], 'solution found')
+
+    def test_12q_circuit_65q_coupling(self):
+
+        backend = FakeManhattan()
+        coupling_map = CouplingMap(backend.configuration().coupling_map)
+        backend_props = backend.properties()
+
+        matrix = np.diag([1]*11, +1) + np.diag([1] * 11, -1)
+        matrix[0, 11] = 1
+        matrix[11, 0] = 1
+
+        circuit = GraphState(matrix)
+        dag = circuit_to_dag(circuit)
+
+        pass_ = MCMCLayout(coupling_map, iteration_limit=1000, strict_direction=False, seed=self.seed)
+        pass_.run(dag)
+        layout = pass_.property_set['layout']
+
+        print(layout)
         self.assertEqual(pass_.property_set['MCMCLayout_stop_reason'], 'solution found')
 
 if __name__ == '__main__':

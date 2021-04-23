@@ -22,7 +22,7 @@ from qiskit.test import QiskitTestCase
 
 
 class TestLayout2qDistance(QiskitTestCase):
-    """ Trivial layout scenarios"""
+    """Test error-ish of Layout Score"""
 
     def test_no_layout(self):
         """No Layout. Empty Circuit CouplingMap map: None. Result: None
@@ -38,6 +38,10 @@ class TestLayout2qDistance(QiskitTestCase):
         pass_.run(dag)
 
         self.assertIsNone(pass_.property_set['layout_score'])
+
+
+class TestTrivialLayout2qDistance(QiskitTestCase):
+    """ Trivial layout scenarios"""
 
     def test_no_cx(self):
         """Empty Circuit CouplingMap map: None. Result: 0

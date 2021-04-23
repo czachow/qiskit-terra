@@ -33,7 +33,7 @@ class LayoutScorer(AnalysisPass):
     i.e. fidelity of the layout. Alternatively, it returns the score. The closer the number to one, the better
     the selection. Therefore, 1 is a perfect error-free layout. No CX direction is considered.
     """
-    def __init__(self, coupling_map, backend_prop=None, property_name='layout_score'):
+    def __init__(self, coupling_map, backend_properties=None, property_name='layout_score'):
         """LayoutScorer initializer.
 
         Args:
@@ -43,7 +43,7 @@ class LayoutScorer(AnalysisPass):
         """
         super().__init__()
         self.coupling_map = coupling_map
-        self.backend_prop = backend_prop
+        self.backend_properties = backend_properties
         self.property_name = property_name
 
     def run(self, dag):
@@ -62,11 +62,14 @@ class LayoutScorer(AnalysisPass):
     def evaluate(self, dag, layout):
         """ Evaluate the score on a layout and dag. 
         Calculate the score as the product of all two qubit gate fidelities.
-        Assign an artificial fidelity to virtual gates that require swap operations in the implementation.
+        Assign an artificial fidelity to virtual gates that require swap 
+        operations in the implementation.
 
         Args:
             dag (DAGCircuit): DAG to evaluate
             layout (Layout): Layout to evaluate
+        Return:
+            layout_fidelity (float): The score of the layout
         """
         layout_fidelity = 1.0
         for node in dag.two_qubit_ops():
@@ -79,13 +82,14 @@ class LayoutScorer(AnalysisPass):
         """Calculate the 2q fidelity
         Depending on the distance of the qubits, there are different options
         for introducing the additional swaps. Therefore the average over all paths is used.
+        See also Arxiv 2103.15695 on page 5 as a reference.
 
         As an example the fidelity for a cx-gate between qb1 and qb4 in a chain is given as:
         f_14 = 1/3 * f_12 f_23 f_34 (f_12^5 f_23^5 + f_23^5 f_34^5 f_12^5 f_34^5)
         """
         def cx_fid(qubits):
-            if self.backend_prop:
-                return 1 - self.backend_prop.gate_error("cx", qubits)
+            if self.backend_properties:
+                return 1 - self.backend_properties.gate_error("cx", qubits)
             else:
                 return 1 - DEFAULT_CX_ERROR
 
@@ -94,12 +98,8 @@ class LayoutScorer(AnalysisPass):
         cplpath_edges = [[cplpath[k], cplpath[k+1]] for k in range(cplpath_length)]
 
         path_fid = 1.0
-        path_fid *= np.sum(
-            [np.prod(
-                [cx_fid(qubits)**5 for qubits in qubits_subset]
-                )
-                for qubits_subset in combinations(cplpath_edges, cplpath_length-1)]
-            )
+        path_fid *= np.sum([np.prod([cx_fid(qubits)**5 for qubits in qubits_subset])
+            for qubits_subset in combinations(cplpath_edges, cplpath_length-1)])
         path_fid *= np.prod([cx_fid(qubits) for qubits in cplpath_edges]) / cplpath_length
 
         return path_fid
