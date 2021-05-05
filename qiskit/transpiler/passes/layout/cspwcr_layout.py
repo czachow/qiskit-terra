@@ -192,61 +192,58 @@ class CSPWCRLayout(AnalysisPass):
     def run(self, dag):
         """ run the layout method """
         lcm = self._dag_to_lcm(dag)
+        pcm = self._cm_to_pcm(self.coupling_map)
 
         for _ in range(self.relaxation_limit):
-            if (
-                self.time_limit is None and
-                self.call_limit is None and
-                self.solution_limit == 1
-                ):
-                solver = RecursiveBacktrackingSolver()
+                
+            if not self._check_degree_lcm(lcm, pcm):
+                self._mod_lcm(lcm)
             else:
                 solver = CustomSolver(call_limit=self.call_limit, 
-                                    time_limit=self.time_limit,
-                                    solution_limit=self.solution_limit)
+                                      time_limit=self.time_limit,
+                                      solution_limit=self.solution_limit)
 
-            problem = self._lcm_to_csp(lcm)
-            problem.setSolver(solver)
-            
-            if self.solution_limit == 1:
-                solution_list = [problem.getSolution()]
-            else:
-                solution_list = problem.getSolutions()
-
-            if any(solution_list):
-                # solution_list has entries
-                stop_reason = 'solution found'
-
+                problem = self._lcm_to_csp(lcm)
+                problem.setSolver(solver)
+                
                 if self.solution_limit == 1:
-                    solution = solution_list[0]
+                    solution_list = [problem.getSolution()]
                 else:
-                    layout_scorer = LayoutScorer(self.coupling_map, self.backend_properties)
-                    sol_layouts = [Layout({v: dag.qubits[k] for k, v in solution.items()})
-                                for solution in solution_list]
-                    layout_fidelities = [layout_scorer.evaluate(dag, layout) for layout in sol_layouts]
-                    max_fid_idx = np.argsort(layout_fidelities)[-1]
-                    solution = solution_list[max_fid_idx]
+                    solution_list = problem.getSolutions()
 
-                self.property_set['layout'] = Layout(
-                    {v: dag.qubits[k] for k, v in solution.items()})
-                self.property_set['CSPWCRLayout_stop_reason'] = stop_reason
-                break
+                if any(solution_list):
+                    # solution_list has entries
+                    stop_reason = 'solution found'
 
-            else:
-                # solution_list is empty
-                stop_reason = 'nonexistent solution'
-                if (
-                        solver.time_current is not None and
-                        solver.time_current >= self.time_limit
-                    ):
-                    stop_reason = 'time limit reached'
-                elif (
-                        solver.call_current is not None and
-                        solver.call_current >= self.call_limit
-                    ):
-                    stop_reason = 'call limit reached'    
-                self.property_set['CSPWCRLayout_stop_reason'] = stop_reason
-                self._mod_lcm(lcm)
+                    if self.solution_limit == 1:
+                        solution = solution_list[0]
+                    else:
+                        layout_scorer = LayoutScorer(self.coupling_map, self.backend_properties)
+                        sol_layouts = [Layout({v: dag.qubits[k] for k, v in solution.items()})
+                                    for solution in solution_list]
+                        layout_fidelities = [layout_scorer.evaluate(dag, layout) for layout in sol_layouts]
+                        max_fid_idx = np.argsort(layout_fidelities)[-1]
+                        solution = solution_list[max_fid_idx]
+
+                    self.property_set['layout'] = Layout(
+                        {v: dag.qubits[k] for k, v in solution.items()})
+                    self.property_set['CSPWCRLayout_stop_reason'] = stop_reason
+                    break
+
+                else:
+                    # solution_list is empty
+                    stop_reason = 'nonexistent solution'
+                    if (
+                            solver.time_limit is not None and
+                            solver.time_current >= self.time_limit
+                        ):
+                        stop_reason = 'time limit reached'
+                    elif (
+                            solver.call_limit is not None and
+                            solver.call_current >= self.call_limit
+                        ):
+                        stop_reason = 'call limit reached'    
+                    self.property_set['CSPWCRLayout_stop_reason'] = stop_reason
 
     def _lcm_to_csp(self, lcm):
         """ Create a CSP Problem from an LCM """
@@ -274,24 +271,60 @@ class CSPWCRLayout(AnalysisPass):
             Look for nodes with maximum degree. 
             Remove random edge from this group.
         """
-        # choose random node one
-        node_list = lcm.nodes()
+        print(lcm.edges.data())
+
+        # choose random node with high degree
+        node_list = list(lcm.nodes())
         node_degree_list = [lcm.degree(node) for node in node_list]
         nd_list_max = np.amax(node_degree_list)
         nd_list_indexes = [idx for idx, val in enumerate(node_degree_list) if val == nd_list_max]
-        node1 = self.rnd_gen.choice(nd_list_indexes)
+        node1_idx = self.rnd_gen.choice(nd_list_indexes)
+        node1 = node_list[node1_idx]
+        print("node1: ", node1)
 
-        # random edge
-        neighbour_list = [n for n in lcm.neighbors(node1)]
-        weight_adj_edge_list = [lcm.adj[node1][node2]["weight"] for node2 in neighbour_list]
-        wa_list_min = np.amin(weight_adj_edge_list)
-        wa_list_indexes = [idx for idx, val in enumerate(weight_adj_edge_list) if val == wa_list_min]
-        node2_idx = self.rnd_gen.choice(wa_list_indexes)
+        # choose high degree neighbour
+        neighbour_list = [node for node in lcm.neighbors(node1)]
+        neighbour_degree_list = [lcm.degree(node) for node in neighbour_list]
+        ngd_list_max = np.amax(neighbour_degree_list)
+        ngd_list_indexes = [idx for idx, val in enumerate(neighbour_degree_list) if val == ngd_list_max]
+        node2_idx = self.rnd_gen.choice(ngd_list_indexes)
+        node2 = neighbour_list[node2_idx]
+        print("node2: ", node2)
 
-        # remove edge
-        lcm.remove_edge(node1, neighbour_list[node2_idx])
+        # remove edge and check for shortest path n1 to n2
+        weight_n1n2 = lcm.edges[node1, node2]["weight"]
+        lcm.remove_edge(node1, node2)
 
-        return lcm
+        # graph no more connected?
+        if not nx.is_connected(lcm):
+
+            # choose low degree neighbour
+            neighbour_degree_list = [lcm.degree(node) for node in neighbour_list]
+            nd_list_min = np.amin(neighbour_degree_list)
+            nd_list_indexes = [idx for idx, val in enumerate(neighbour_degree_list) if val == nd_list_min and idx != node2_idx]
+            node3_idx = self.rnd_gen.choice(nd_list_indexes)
+            node3 = neighbour_list[node3_idx]
+            
+            # update weight and add edge
+            lcm.add_edge(node2, node3, weight=weight_n1n2)
+            lcm.edges[node1, node3]["weight"] += 1
+
+        print(lcm.edges.data())
+
+    def _check_degree_lcm(self, lcm, pcm):
+        """
+            Check if the logical coupling map lcm seems to be 
+            mappable to the physical coupling map pcm
+            Input:
+                lcm:
+                pcm:
+            Output:
+                mappable (Bool): Is lcm mappable to pcm
+        """    
+        pcm_degree = sorted([deg for _, deg in pcm.degree()])
+        lcm_degree = sorted([deg for _, deg in lcm.degree()])
+        
+        return all([ld <= pd for (pd, ld) in zip(pcm_degree, lcm_degree)])
 
     def _dag_to_lcm(self, dag):
         """ Creates a logical coupling map (lcm) from the dag 
@@ -316,4 +349,12 @@ class CSPWCRLayout(AnalysisPass):
                 lcm.add_edge(qb1, qb2, weight=1)
 
         return lcm
+
+    def _cm_to_pcm(self, cm):
+        """
+
+        """
+        pcm = nx.Graph()
+        pcm.add_edges_from(cm.get_edges())
+        return pcm
         
