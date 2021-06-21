@@ -120,6 +120,7 @@ Additional Passes
    CXDirection
    GateDirection
    MergeAdjacentBarriers
+   RemoveBarriers
    BarrierBeforeFinalMeasurements
    RemoveFinalMeasurements
    DAGFixedPoint
@@ -201,3 +202,4 @@ from .utils import MergeAdjacentBarriers
 from .utils import DAGFixedPoint
 from .utils import FixedPoint
 from .utils import Error
+from .utils import RemoveBarriers

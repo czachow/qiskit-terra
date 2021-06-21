@@ -71,8 +71,7 @@ class CustomSolver(RecursiveBacktrackingSolver):
 
         return False
 
-    def getSolution(self,
-                    domains, constraints, vconstraints):
+    def getSolution(self, domains, constraints, vconstraints):
         """Wrap RecursiveBacktrackingSolver.getSolution to add the limits."""
         if self.call_limit is not None:
             self.call_current = 0
@@ -82,56 +81,20 @@ class CustomSolver(RecursiveBacktrackingSolver):
             self.solution_current = 0
         return super().getSolution(domains, constraints, vconstraints)
 
-    def getSolutions(self,
-                     domains, constraints, vconstraints):
-        """ Wrap RecursiveBacktrackingSolver.getSolutions to add the limits."""
-        if self.call_limit is not None:
-            self.call_current = 0
-        if self.time_limit is not None:
-            self.time_start = time()
-        if self.solution_limit is not None:
-            self.solution_current = 0
-        return super().getSolutions(domains, constraints, vconstraints)
-
-    def recursiveBacktracking(self,  # pylint: disable=invalid-name
-                              solutions, domains, vconstraints, assignments, single):
+    def recursiveBacktracking(self, solutions, domains, vconstraints, assignments, single):
         """Like ``constraint.RecursiveBacktrackingSolver.recursiveBacktracking`` but
-        limited to the introduced limits """
-        if (
-                self.callLimitReached() or
-                self.timeLimitReached() or
-                self.solutionLimitReached(solutions)
-            ):
-            return solutions
+        limited in the amount of calls by ``self.call_limit``"""
+        if self.limit_reached():
+            return None
         return super().recursiveBacktracking(solutions, domains, vconstraints, assignments, single)
-
-
-class CustomConstraint(Constraint):
-    """Based on constraint.FunctionConstraint, reduces all the generality to check if a
-    2-sized-tuple (control, target) is in a set (edges).
-    """
-
-    def __init__(self, edges, assigned=True):
-        self._edges = edges
-        self._assigned = assigned
-
-    def __call__(self, variables, domains, assignments, forwardcheck=False):
-        parms = (assignments.get(variables[0], Unassigned),
-                 assignments.get(variables[1], Unassigned))
-        if Unassigned in parms:
-            return (self._assigned or parms in self._edges) and (
-                    not forwardcheck or
-                    parms == (Unassigned, Unassigned) or
-                    self.forwardCheck(variables, domains, assignments)
-            )
-        return parms in self._edges
 
 
 class CSPLayout(AnalysisPass):
     """If possible, chooses a Layout as a CSP, using backtracking."""
 
-    def __init__(self, coupling_map, strict_direction=False, seed=None, call_limit=1000,
-                 time_limit=10, solution_limit=1, backend_properties=None):
+    def __init__(
+        self, coupling_map, strict_direction=False, seed=None, call_limit=1000, time_limit=10
+    ):
         """If possible, chooses a Layout as a CSP, using backtracking.
         If not possible, does not set the layout property. In all the cases,
         the property `CSPLayout_stop_reason` will be added with one of the
@@ -178,20 +141,13 @@ class CSPLayout(AnalysisPass):
                           "Defaulting to one solution!", RuntimeWarning)
 
     def run(self, dag):
-        """ run the layout method """
+        """run the layout method"""
+        qubits = dag.qubits
+        cxs = set()
 
-        if (
-                self.time_limit is None and
-                self.call_limit is None and
-                self.solution_limit == 1
-            ):
-            csp_solver = RecursiveBacktrackingSolver()
-        else:
-            csp_solver = CustomSolver(call_limit=self.call_limit, 
-                                      time_limit=self.time_limit,
-                                      solution_limit=self.solution_limit)
-
-        problem = self._get_csp_problem(dag, csp_solver)
+        for gate in dag.two_qubit_ops():
+            cxs.add((qubits.index(gate.qargs[0]), qubits.index(gate.qargs[1])))
+        edges = set(self.coupling_map.get_edges())
 
         if self.solution_limit == 1:
             solution_list = [problem.getSolution()]
@@ -215,26 +171,15 @@ class CSPLayout(AnalysisPass):
                 {v: dag.qubits[k] for k, v in solution.items()})
             self.property_set['CSPLayout_stop_reason'] = stop_reason
 
-        else:
-            # solution_list is empty
-            stop_reason = 'nonexistent solution'
-            if (
-                    csp_solver.time_current is not None and
-                    csp_solver.time_current >= self.time_limit
-                ):
-                stop_reason = 'time limit reached'
-            elif (
-                    csp_solver.call_current is not None and
-                    csp_solver.call_current >= self.call_limit
-                ):
-                stop_reason = 'call limit reached'
-                
-        self.property_set['CSPLayout_stop_reason'] = stop_reason
+        if self.strict_direction:
 
-    def _get_csp_problem(self, dag, solver):
-        """ Create a CSP Problem """
-        logical_edges = set()
-        physical_edges = set()
+            def constraint(control, target):
+                return (control, target) in edges
+
+        else:
+
+            def constraint(control, target):
+                return (control, target) in edges or (target, control) in edges
 
         for gate in dag.two_qubit_ops():
             logical_edges.add((dag.qubits.index(gate.qargs[0]),
@@ -245,15 +190,17 @@ class CSPLayout(AnalysisPass):
             logical_edges = {tuple(sorted(edge)) for edge in logical_edges}
             physical_edges = {tuple(sorted(edge)) for edge in physical_edges}
 
-        variables = list(range(len(dag.qubits)))
-        variable_domains = list(self.coupling_map.physical_qubits)
-        random.Random(self.seed).shuffle(variable_domains)
+        if solution is None:
+            stop_reason = "nonexistent solution"
+            if isinstance(solver, CustomSolver):
+                if solver.time_current is not None and solver.time_current >= self.time_limit:
+                    stop_reason = "time limit reached"
+                elif solver.call_current is not None and solver.call_current >= self.call_limit:
+                    stop_reason = "call limit reached"
+        else:
+            stop_reason = "solution found"
+            self.property_set["layout"] = Layout({v: qubits[k] for k, v in solution.items()})
+            for reg in dag.qregs.values():
+                self.property_set["layout"].add_register(reg)
 
-        problem = Problem(solver)
-        problem.addVariables(variables, variable_domains)
-        problem.addConstraint(AllDifferentConstraint())  # each wire is map to a single qbit
-
-        for edge in logical_edges:
-            problem.addConstraint(CustomConstraint(physical_edges), (edge[0], edge[1]))
-
-        return problem
+        self.property_set["CSPLayout_stop_reason"] = stop_reason
