@@ -135,6 +135,7 @@ from .layout import NoiseAdaptiveLayout
 from .layout import SabreLayout
 from .layout import CSPLayout
 from .layout import CspRbsLayout
+from .layout import VF2RSLayout
 from .layout import ApplyLayout
 from .layout import LayoutScorer
 from .layout import Layout2qDistance
