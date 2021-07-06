@@ -67,7 +67,7 @@ class VF2RSLayout(AnalysisPass):
         ig = self.dag_to_ig(dag)
         cg = self.cm_to_cg(self.coupling_map)
 
-        mapping = rx.graph_vf2_mapping(cg, ig, subgraph=True, id_order=True, induced=False)
+        mapping = rx.graph_vf2_mapping(cg, ig, subgraph=True, id_order=False, induced=False)
         if not mapping:
             mapping = self.binsearch_edges(ig, cg)
 
@@ -103,7 +103,7 @@ class VF2RSLayout(AnalysisPass):
         level_idx = 0
         
         for c in range(self.call_limit):
-            map_t = rx.graph_vf2_mapping(cg_t, ig, subgraph=True, id_order=True, induced=False)
+            map_t = rx.graph_vf2_mapping(cg_t, ig, subgraph=True, id_order=False, induced=False)
 
             if map_t:
                 mapping = map_t
