@@ -83,38 +83,48 @@ class VF2RSLayout(AnalysisPass):
         self.property_set["VF2Layout_stop_reason"] = stop_reason
 
     def binsearch_edges(self, ig, cg):
-        num_nodes = cg.num_nodes()
-        num_logi_edges = ig.num_edges()
-        num_real_edges = cg.num_edges()
-        num_virt_edges = (num_nodes * (num_nodes - 1)) // 2 - num_real_edges
-
+        """
+            Todo: Description
+        """
         dm = self.distmatrix_from_graph(cg)
-        edge_list = [(row, col, dm[row][col]) for row in range(num_nodes) for col in range(row+1, num_nodes)]
-        edge_weights = [weight for _, _, weight in edge_list]
-        edge_weights_idx = np.argsort(edge_weights)[::-1]
-        edge_weights_level = [idx for idx in range(num_real_edges + num_virt_edges) \
-                              if edge_weights[edge_weights_idx[idx]] != edge_weights[edge_weights_idx[idx - 1]]]
-        
-        # calculate total mapping
-        cg_t = rx.PyGraph()
-        cg_t.add_nodes_from(cg.nodes())
-        cg_t.add_edges_from(edge_list)
-        
-        level_idx = 0
-        
+        num_nodes = cg.num_nodes()
+
+        real_edges = [(row, col, dm[row][col]) for row, col in cg.edge_list()]
+        virt_edges = [(row, col, dm[row][col]) for row in range(num_nodes) 
+                                               for col in range(row+1, num_nodes)
+                                               if (row, col, dm[row][col]) not in real_edges]
+
+        vied_weights = [weight for _, _, weight in virt_edges]
+        vied_idx = np.argsort(vied_weights)
+
+        idx_b = 0
+        idx_t = len(virt_edges)
+        idx_m = len(virt_edges)
+
         for c in range(self.call_limit):
-            map_t = rx.graph_vf2_mapping(cg_t, ig, subgraph=True, id_order=False, induced=False)
+            # break if finished
+            if (idx_b == idx_m):
+                break
+
+            cg_t = cg.copy()
+            addi_edges = [virt_edges[edge_idx] for edge_idx in vied_idx[idx_b : idx_t]]
+            cg_t.add_edges_from(addi_edges)
+
+            if cg_t.num_edges() < ig.num_edges():
+                break
+            else:
+                map_t = rx.graph_vf2_mapping(cg_t, ig, subgraph=True, id_order=False, induced=False)
 
             if map_t:
                 mapping = map_t
-
-                for idx in range(edge_weights_level[level_idx], edge_weights_level[level_idx+1]):
-                    e1, e2, w = edge_list[edge_weights_idx[idx]]
-                    cg_t.remove_edge(e1, e2)
-                level_idx += 1
+                slk = (idx_b + idx_t) // 2    
+                idx_t = idx_m
+                idx_m = slk
             else:
-                break
-        
+                slk = (idx_m + idx_t) // 2
+                idx_b = idx_m
+                idx_m = slk
+
         return mapping
 
     def distmatrix_from_graph(self, graph):
