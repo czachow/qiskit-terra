@@ -22,3 +22,4 @@ from .apply_layout import ApplyLayout
 from .layout_2q_distance import Layout2qDistance
 from .enlarge_with_ancilla import EnlargeWithAncilla
 from .full_ancilla_allocation import FullAncillaAllocation
+from .exvf2_layout import ExVF2Layout

@@ -143,6 +143,7 @@ from .layout import ApplyLayout
 from .layout import Layout2qDistance
 from .layout import EnlargeWithAncilla
 from .layout import FullAncillaAllocation
+from .layout import ExVF2Layout
 
 # routing
 from .routing import BasicSwap
