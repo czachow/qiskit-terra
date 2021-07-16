@@ -3,7 +3,7 @@ from qiskit.circuit.library import GraphState
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 
 
-def graphstate_manhatten_ring(num_qubits=12):
+def graphstate_manhattan_ring(num_qubits=12):
     def ring_map(size):
         for j in range(size):
             yield [j, (j+1) % size]
@@ -25,14 +25,14 @@ def graphstate_manhatten_ring(num_qubits=12):
     return qc
 
 
-def graphstate_manhatten_ring_fm(num_qubits=12):
-    qc = graphstate_manhatten_ring(num_qubits)
+def graphstate_manhattan_ring_fm(num_qubits=12):
+    qc = graphstate_manhattan_ring(num_qubits)
     qc.measure_all()
     return qc
 
 
-def graphstate_manhatten_ring_hm(num_qubits=12):
-    qc = graphstate_manhatten_ring(num_qubits)
+def graphstate_manhattan_ring_hm(num_qubits=12):
+    qc = graphstate_manhattan_ring(num_qubits)
 
     creg = qc._create_creg(int(num_qubits / 2), 'meas')
     qc.add_register(creg)

@@ -17,8 +17,8 @@ few further swap are needed. It is implemented such that the method
 will always find a solution. 
 """
 import random
+import retworkx as rx
 
-from retworkx import PyGraph, PyDiGraph, graph_vf2_mapping, digraph_vf2_mapping
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.basepasses import AnalysisPass
 
@@ -46,6 +46,9 @@ class ExVF2Layout(AnalysisPass):
         self.seed = seed
         self.id_order = id_order 
 
+        if self.strict_direction:
+            raise ValueError("This Algorithm does not check for Direction!")
+
     def run(self, dag):
         """run the layout method"""
         qubits = dag.qubits
@@ -55,38 +58,70 @@ class ExVF2Layout(AnalysisPass):
             for gate in dag.two_qubit_ops()
         ]
 
-        if self.strict_direction:
-            cm_graph = self.coupling_map.graph
-            im_graph = PyDiGraph()
-            vf2_mapping = digraph_vf2_mapping
-        else:
-            cm_graph = self.coupling_map.graph.to_undirected()
-            im_graph = PyGraph()
-            vf2_mapping = graph_vf2_mapping
-
-        cm_nodes = list(cm_graph.node_indexes())
-        if self.seed != -1:
-            random.Random(self.seed).shuffle(cm_nodes)
-            shuffled_cm_graph = type(cm_graph)()
-            shuffled_cm_graph.add_nodes_from(cm_nodes)
-            new_edges = [(cm_nodes[edge[0]], cm_nodes[edge[1]]) for edge in cm_graph.edge_list()]
-            shuffled_cm_graph.add_edges_from_no_data(new_edges)
-            cm_nodes = [k for k, v in sorted(enumerate(cm_nodes), key=lambda item: item[1])]
-            cm_graph = shuffled_cm_graph
+        cm_graph = self.coupling_map.graph.to_undirected()
+        cm_nodes = cm_graph.node_indexes()
+        im_graph = rx.PyGraph()
         im_graph.add_nodes_from(range(len(qubits)))
         im_graph.add_edges_from_no_data(interactions)
 
-        mapping = vf2_mapping(
-            cm_graph, im_graph, subgraph=True, id_order=self.id_order, induced=False
-        )
+        opt_k = self.binsearch(cm_graph, im_graph)
 
-        if mapping:
-            stop_reason = "solution found"
-            layout = Layout({qubits[im_i]: cm_nodes[cm_i] for cm_i, im_i in mapping.items()})
-            self.property_set["layout"] = layout
-            for reg in dag.qregs.values():
-                self.property_set["layout"].add_register(reg)
-        else:
-            stop_reason = "nonexistent solution"
+        dist = rx.graph_all_pairs_dijkstra_path_lengths(cm_graph, lambda _: 1)
+        cm_graph_ext, perm = self._build_distk_graph(cm_graph, dist, opt_k)
+        perm = {new: old for old, new in perm.items()}
 
+        vf2 = rx.graph_vf2_mapping(cm_graph_ext, im_graph, 
+                                   subgraph=True, id_order=False, induced=False)
+        mapping = {perm[k]: v for k, v in next(vf2).items()}
+
+        stop_reason = "solution found"
+        layout = Layout({qubits[im_i]: cm_nodes[cm_i] for cm_i, im_i in mapping.items()})
+        self.property_set["layout"] = layout
+        for reg in dag.qregs.values():
+            self.property_set["layout"].add_register(reg)
         self.property_set["VF2Layout_stop_reason"] = stop_reason
+
+    def _build_distk_graph(self, graph, dist=None, k=1):
+        """ Create the extended graph:
+        connect every pair of nodes at distance below or equal than k.
+        """
+        if dist is None:
+            dist = rx.graph_all_pairs_dijkstra_path_lengths(graph, lambda _: 1)
+
+        nodes = graph.node_indexes()
+        perm = {v: i for i, v in enumerate(nodes)}
+
+        graph_k = rx.PyGraph(multigraph=False)
+        graph_k.add_nodes_from(
+            list(range(len(nodes)))
+        )
+        for v in nodes:
+            for w, dval in dist[v].items():
+                if dval <= k:
+                    graph_k.add_edge(perm[v], perm[w], None)
+        
+        return graph_k, perm
+
+    def binsearch(self, first, second):
+        """ Binary search over the "distance" threshold.
+        This is equivalent to find the optimal value such that all "logical" qubits 
+        that interact in the circuit are mapped to physical qubits whose distance 
+        is below this value.
+        """
+        L = 1
+        R = len(first) - 1
+        
+        dist = rx.graph_all_pairs_dijkstra_path_lengths(first, lambda _: 1)
+        
+        while L < R:
+            mid = (L + R) // 2
+            graph, _ = self._build_distk_graph(first, dist, mid)
+            res = rx.is_subgraph_isomorphic(graph, second,
+                                            id_order=False, induced=False)
+            
+            if not res:
+                L = mid + 1
+            else:
+                R = mid
+
+        return L

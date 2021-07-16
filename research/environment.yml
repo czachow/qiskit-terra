@@ -14,3 +14,5 @@ dependencies:
         - qiskit-aer-gpu
         - qiskit-ibmq-provider
         - pyarrow
+        - graphviz
+        - retworkx git+https://github.com/czachow/retworkx.git@vf2-map-advanced
