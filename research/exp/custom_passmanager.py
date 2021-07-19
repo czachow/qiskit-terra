@@ -10,7 +10,7 @@ from qiskit.transpiler.passes import ApplyLayout
 from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary as sel
 
 
-def custom_pass_manager(backend, layout_instance, swap_instance, layout_reps=1):
+def custom_pass_manager(backend, layout_instance, swap_instance):
     # basis_gates = backend.configuration().basis_gates
     basis_gates = ['s', 'sdg', 'sx', 'h', 'cx']
     coupling_map = CouplingMap(backend.configuration().coupling_map)
@@ -18,7 +18,7 @@ def custom_pass_manager(backend, layout_instance, swap_instance, layout_reps=1):
     def _swap_condition(property_set):
         return not property_set['is_swap_mapped']
 
-    _layout = [layout_instance] * layout_reps
+    _layout = [layout_instance]
     _embed = [FullAncillaAllocation(coupling_map), EnlargeWithAncilla(), ApplyLayout()]
     _unroll3q = Unroll3qOrMore()
     _swap_check = CheckMap(coupling_map)
